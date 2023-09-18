@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>在偏鄉的我今晚要吃甚麼偏香食物</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.3.4/dist/leaflet.css" integrity="sha512-puBpdR0798OZvTTbP4A8Ix/l+A4dHDD0DGqYW6RQ+9jxkRFclaxxQb/SJAWZfWAkuyeQUytO7+7N4QKrDh+drA==" crossorigin=""/>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      margin: 0;
+    }
+    #map {
+      width: 100%;
+      height: 70%;
+      background: #333;
+    }
+    #address-input {
+      width: 100%;
+      padding: 10px;
+    }
+    #restaurants-list {
+      margin-top: 10px;
+    }
+    .restaurant-marker {
+      background-color: red;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      text-align: center;
+      vertical-align: middle;
+      line-height: 20px;
+    }
+    #random-restaurant-button {
+      margin-top: 10px;
+      padding: 5px 10px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <input type="text" id="address-input" placeholder="輸入地址">
+  <div id="map"></div>
+  <button id="random-restaurant-button">重新選擇</button>
+  <div id="restaurants-list"></div>
+
+
+  <script src="https://unpkg.com/leaflet@1.3.4/dist/leaflet.js" integrity="sha512-nMMmRyTVoLYqjP9hrbed9S+FzjZHW5gY1TWCHA5ckwXZBadntCNs8kEqAWdrb9O7rxbCaA4lKTIWjDXZxflOcA==" crossorigin=""></script>
+  <script src="https://unpkg.com/jquery"></script>
+  <script>
+    var map;
+    var marker;
+    var selectedRestaurantMarker; // 標記所選餐廳
+
+
+    map = L.map('map').setView([23.976230, 121.604371], 14); // HLC locate
+
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '<a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+        maxZoom: 18,
+    }).addTo(map);
+
+
+    // 地址框輸入
+    var addressInput = document.getElementById('address-input');
+    addressInput.addEventListener('change', function() {
+      var address = addressInput.value;
+      if (address) {
+        // 使用Geocoding 作為地址編碼和座標獲取
+        $.getJSON('https://nominatim.openstreetmap.org/search?format=json&q=' + address + ', Hualien', function(data) {
+          if (data.length > 0) {
+            var lat = parseFloat(data[0].lat);
+            var lon = parseFloat(data[0].lon);
+            var newLatLng = L.latLng(lat, lon);
+
+
+            // 移動地圖到新的視座標
+            map.setView(newLatLng, 14);
+
+
+            // 如果已經有座標，移除TA
+            if (marker) {
+              map.removeLayer(marker);
+            }
+
+
+            // Create new marker
+            marker = L.marker(newLatLng);
+            marker.addTo(map);
+
+
+            // Show Near by Restaurants
+            showNearbyRestaurants(lat, lon);
+          } else {
+            alert('地址錯誤');
+          }
+        });
+      }
+    });
+
+
+    function showNearbyRestaurants(lat, lon) {
+      var restaurantsList = document.getElementById('restaurants-list');
+      restaurantsList.innerHTML = 'Loading nearby restaurants...';
+
+
+      // 使用Overpass API查询附近的餐厅
+      $.getJSON('https://overpass-api.de/api/interpreter?data=[out:json];node(around:' + 1000 + ',' + lat + ',' + lon + ')[amenity=restaurant];out;', function(data) {
+        var restaurants = data.elements;
+        if (restaurants.length > 0) {
+          // 随机选择一个餐厅
+          var randomIndex = Math.floor(Math.random() * restaurants.length);
+          var selectedRestaurant = restaurants[randomIndex];
+
+
+          // 構建餐廳List
+          var restaurantListHTML = '';
+          for (var i = 0; i < restaurants.length; i++) {
+            var restaurantName = restaurants[i].tags.name || 'Unnamed Restaurant';
+            var isRed = i === randomIndex ? 'style="color: red;"' : '';
+            restaurantListHTML += '<li ' + isRed + '>' + restaurantName + '</li>';
+          }
+
+
+          // 所選餐廳Red TOP
+          restaurantListHTML = '<li style="color: red;">' + (selectedRestaurant.tags.name || 'Unnamed Restaurant') + '</li>' + restaurantListHTML;
+
+
+          restaurantsList.innerHTML = '<h3>附近餐廳</h3>';
+          restaurantsList.innerHTML += '<ul>' + restaurantListHTML + '</ul>';
+         
+          // Create new markert for sc rest " L"
+          if (selectedRestaurantMarker) {
+            map.removeLayer(selectedRestaurantMarker);
+          }
+          selectedRestaurantMarker = L.marker([selectedRestaurant.lat, selectedRestaurant.lon], {icon: L.divIcon({className: 'restaurant-marker', html: 'L'})});
+          selectedRestaurantMarker.addTo(map);
+        } else {
+          restaurantsList.innerHTML = '附近沒有餐廳';
+        }
+      });
+    }
+
+
+    // randomRestaurant Butto for new restaurant
+    var randomRestaurantButton = document.getElementById('random-restaurant-button');
+    randomRestaurantButton.addEventListener('click', function() {
+      // input the new addresInput
+      addressInput.dispatchEvent(new Event('change'));
+    });
+  </script>
+</body>
+</html>
+
+
+
+
+
+
